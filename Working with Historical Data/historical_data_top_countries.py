@@ -1,160 +1,82 @@
-import os
-import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+import os
 import geopandas as gpd
-import plotly.graph_objects as go
-from dash import Dash, dcc, html, Input, Output
 
-# Load and Prepare Data
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Change working directory to project root (Update this path as needed)
 
-# Read CSVs
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Gets the directory of this script
+
 df_airport = pd.read_csv(os.path.join(BASE_DIR, "Historical Data", "airport - airport.csv"))
 df_network = pd.read_csv(os.path.join(BASE_DIR, "Historical Data", "airline_network.csv"))
 
-# Clean df_network
+# Checking Dataset Info
+
+# print("Head\n", df_airport.head())
+# print("Info\n", df_airport.info())
+# print("Describe\n", df_airport.describe())
+
+# print("Head\n", df_network.head())
+# print("Info\n", df_network.info())
+# print("Describe\n", df_network.describe())
+
+
+# Dropping Duplicates and checking for null and unique values
+
 df_network.drop_duplicates(inplace=True)
+# print(df_network.isnull().sum())
+# print("Unique Airlines:", df_network["Airline"].nunique())
+# print("Unique Equipment types:", df_network["Equipment"].nunique())
+
+
+# Working with null values
+
 df_network.dropna(subset=["Destination airport ID"], inplace=True)
 df_network.drop(columns=["Codeshare"], inplace=True)
 df_network["Equipment"].fillna("Unknown", inplace=True)
 
-# Merge airport info for source and destination
-df_merged = df_network.merge(df_airport, left_on="Source airport", right_on="IATA", how="left")
-df_merged = df_merged.merge(df_airport, left_on="Destination airport", right_on="IATA", how="left", suffixes=("_source", "_destination"))
+# print(df_network.isnull().sum())
+
+
+# Merging the two dataframes
+# Merged Twice, once for Source Airport, other for Destination Airport
+
+df_merged = df_network.merge(
+    df_airport, left_on="Source airport", right_on="IATA", how="left"
+)
+df_merged = df_merged.merge(
+    df_airport,
+    left_on="Destination airport",
+    right_on="IATA",
+    how="left",
+    suffixes=("_source", "_destination"),
+)
+# print(df_merged.head())
+# print(df_merged.info())
+# print(df_merged.isnull().sum())
+
+
+# Dropping na from merged Dataset
 df_cleaned = df_merged.dropna()
+# print(df_cleaned.isnull().sum())
 
-# Load airlines.dat
-airlines_path = os.path.join(BASE_DIR, "Historical Data", "airlines.dat")
-columns = ["Airline_ID", "Name", "Alias", "IATA", "ICAO", "Callsign", "Country", "Active"]
-df_airlines = pd.read_csv(airlines_path, header=None, names=columns, dtype=str)
 
-# Clean airline data
-df_airlines = df_airlines[df_airlines["Active"] == "Y"]
-df_airlines = df_airlines[df_airlines["IATA"].notnull() & (df_airlines["IATA"] != "\\N")]
-df_airlines = df_airlines[["IATA", "Name"]]
+# Checking Cleaned Dataset
+# print(df_cleaned.shape)
+# print("Unique Source Countries:", df_cleaned["Country_source"].nunique())
+# print("Unique Destination Countries:", df_cleaned["Country_destination"].nunique())
+# print(df_cleaned.sample(5))
 
-# Merge to get airline full name
-df_cleaned = df_cleaned.merge(df_airlines, left_on="Airline", right_on="IATA", how="left")
-df_cleaned.rename(columns={"Name": "Airline_FullName"}, inplace=True)
 
-# Dropdown options
-all_airlines = ["All Airlines"] + sorted(df_cleaned["Airline_FullName"].dropna().unique())
-all_countries = ["All Countries"] + sorted(
-    set(df_cleaned["Country_source"].dropna()).union(df_cleaned["Country_destination"].dropna())
-)
+# Count number of flights per country
+country_counts = df_cleaned["Country_source"].value_counts().head(20)  # Top 20
 
-# Generate Plotly traces
-def generate_flight_traces(airline=None, country=None):
-    filtered_df = df_cleaned.copy()
-
-    if airline and airline != "All Airlines":
-        filtered_df = filtered_df[filtered_df["Airline_FullName"] == airline]
-
-    if country and country != "All Countries":
-        filtered_df = filtered_df[
-            (filtered_df["Country_source"] == country) | 
-            (filtered_df["Country_destination"] == country)
-        ]
-
-    if filtered_df.empty:
-        return []
-
-    sample_df = filtered_df.sample(min(300, len(filtered_df)), random_state=42)
-    traces = []
-
-    colors = np.random.choice([
-        "blue", "purple", "orange", "teal", "magenta", "cyan", "limegreen", "gold", "pink"
-    ], size=len(sample_df))
-
-    for idx, row in sample_df.iterrows():
-        traces.append(go.Scattergeo(
-            lon=[row["Longitude_source"], row["Longitude_destination"]],
-            lat=[row["Latitude_source"], row["Latitude_destination"]],
-            mode='lines',
-            line=dict(width=1, color=colors[idx % len(colors)]),
-            hoverinfo='text',
-            text=f'{row["City_source"]}, {row["Country_source"]} ➝ {row["City_destination"]}, {row["Country_destination"]} ({row["Airline_FullName"]})',
-            showlegend=False
-        ))
-
-    traces.append(go.Scattergeo(
-        lon=sample_df["Longitude_source"],
-        lat=sample_df["Latitude_source"],
-        mode='markers',
-        marker=dict(size=3, color='green', opacity=0.5),
-        name='Source Airports',
-        hoverinfo='skip'
-    ))
-
-    traces.append(go.Scattergeo(
-        lon=sample_df["Longitude_destination"],
-        lat=sample_df["Latitude_destination"],
-        mode='markers',
-        marker=dict(size=3, color='red', opacity=0.5),
-        name='Destination Airports',
-        hoverinfo='skip'
-    ))
-
-    return traces
-
-# Create figure
-def create_figure(airline=None, country=None):
-    traces = generate_flight_traces(airline, country)
-    fig = go.Figure(data=traces)
-
-    fig.update_geos(
-        projection_type="natural earth",
-        showcountries=True,
-        landcolor="lightgrey",
-        showocean=True,
-        oceancolor="lightblue"
-    )
-
-    fig.update_layout(
-        title_text="Flight Paths by Airline and Country",
-        showlegend=True,
-        height=650,
-        margin={"r":0,"t":50,"l":0,"b":0},
-        template="plotly_white"
-    )
-
-    return fig
-
-# Dash App
-app = Dash(__name__)
-app.title = "Flight Path Visualizer"
-
-app.layout = html.Div([
-    html.H1("Flight Path Visualizer", style={"textAlign": "center"}),
-
-    html.Div([
-        html.Label("Select Airline:"),
-        dcc.Dropdown(
-            id='airline-dropdown',
-            options=[{"label": a, "value": a} for a in all_airlines],
-            value="All Airlines"
-        ),
-    ], style={"width": "48%", "display": "inline-block"}),
-
-    html.Div([
-        html.Label("Select Country:"),
-        dcc.Dropdown(
-            id='country-dropdown',
-            options=[{"label": c, "value": c} for c in all_countries],
-            value="All Countries"
-        ),
-    ], style={"width": "48%", "display": "inline-block", "marginLeft": "4%"}),
-
-    dcc.Graph(id='flight-map', figure=create_figure())
-])
-
-@app.callback(
-    Output('flight-map', 'figure'),
-    Input('airline-dropdown', 'value'),
-    Input('country-dropdown', 'value')
-)
-def update_figure(selected_airline, selected_country):
-    return create_figure(selected_airline, selected_country)
-
-if __name__ == '__main__':
-    app.run(debug=True)
+# Plot
+plt.figure(figsize=(12, 6))
+sns.barplot(x=country_counts.values, y=country_counts.index, palette="Blues_r")
+plt.xlabel("Number of Flights")
+plt.ylabel("Country")
+plt.title("Top 20 Countries by Number of Flights")
+plt.show()
