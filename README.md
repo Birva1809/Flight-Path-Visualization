@@ -1,13 +1,30 @@
-# Flight Path Visualization  
+# ✈️ Flight Path Visualizer
+# Project By: [Birva Dave](https://www.linkedin.com/in/birva-dave/)
 
-This project focuses on visualizing flight paths using both historical data and live flight tracking. The goal is to analyze and display flight routes interactively using Python-based visualization libraries.
 
-## Features  
-- **Historical Flight Data Visualization**: Analyze and map historical flight routes.  
-- **Live Flight Tracking** (Upcoming): Display real-time flight paths.  
-- **Interactive Maps**: Use tools like `plotly`, `folium`, and `geopandas` for dynamic visualizations.  
+This project is a visual exploration of global flight routes using both historical data and live tracking (upcoming). It combines geographical visualizations, real-world datasets, and interactive elements to make flight patterns insightful and engaging.
+
+## 🔍 What It Does
+
+- Visualizes **historical airline routes** on an interactive world map.
+- Allows **filtering by airline and country** to explore specific patterns.
+- Plans to integrate **real-time flight tracking** using open aviation APIs.
+
+## 🛠️ Tech Stack
+
+- **Python** (Data processing, backend)
+- **Dash** + **Plotly** (Interactive web-based visualizations)
+- **GeoPandas**, **Cartopy** (Geographical plotting)
+- **Pandas**, **NumPy** (Data manipulation)
 
 ## Installation  
 Ensure you have the required Python libraries installed:  
 ```bash
 pip install pandas matplotlib seaborn plotly geopandas cartopy
+```
+
+---
+
+Check out the `Working with Historical Data` folder for the first phase of the project.  
+Stay tuned for live flight tracking in the next update!
+ 
